@@ -1,0 +1,49 @@
+name: tmc
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tmc
+    ports:
+      # Host port is overridable when 5432 is taken (e.g. Arch postgresql.service):
+      #   TMC_PG_HOST_PORT=55432 docker compose -f infra/compose.yaml up -d postgres
+      # and use the same port in services/s3-attendance/.env.
+      - "${TMC_PG_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tmc"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  s3-migrate:
+    profiles: ["app"]
+    build: ../services/s3-attendance
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      TMC_S3_MIGRATION_DATABASE_URL: postgresql+psycopg://s3_attendance_owner:owner-dev-pw@postgres:5432/tmc
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  s3-attendance:
+    profiles: ["app"]
+    build: ../services/s3-attendance
+    environment:
+      TMC_S3_DATABASE_URL: postgresql+psycopg://s3_attendance_app:app-dev-pw@postgres:5432/tmc
+      # sha256("dev-token-bd-g01-in"); regenerate with the command in services/s3-attendance/README.md
+      TMC_S3_STATION_TOKENS: '{"BD-G01-IN":"11611500e1dbbc5e6fa01a067eed7400afedc57391138b51a8bfeaade654011f"}'
+      TMC_S3_LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      s3-migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

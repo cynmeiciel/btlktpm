@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]          # allow the !reset tag used by compose.ci.yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: detect-private-key
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4                  # keep in sync with ruff in services/s3-attendance/uv.lock
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^services/s3-attendance/
+      - id: ruff-format
+        files: ^services/s3-attendance/
+  - repo: local
+    hooks:
+      - id: lint-imports
+        name: import-linter
+        entry: uv run --directory services/s3-attendance lint-imports
+        language: system
+        pass_filenames: false
+        files: ^services/s3-attendance/src/

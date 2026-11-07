@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tmc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tmc"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGPASSWORD: postgres
+      TMC_S3_DATABASE_URL: postgresql+psycopg://s3_attendance_app:app-dev-pw@localhost:5432/tmc
+      TMC_S3_MIGRATION_DATABASE_URL: postgresql+psycopg://s3_attendance_owner:owner-dev-pw@localhost:5432/tmc
+      TMC_S3_READER_DATABASE_URL: postgresql+psycopg://s4_reporting_reader:reader-dev-pw@localhost:5432/tmc
+      TMC_REQUIRE_DB: "1"  # DB tests must run, never silently skip
+    defaults:
+      run:
+        working-directory: services/s3-attendance
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/s3-attendance/uv.lock
+
+      - run: uv sync --locked
+
+      - name: Create DB roles and schema
+        run: psql -h localhost -U postgres -d tmc -v ON_ERROR_STOP=1 -f ../../infra/postgres/init/01-roles.sql
+
+      - name: Apply migrations
+        if: hashFiles('services/s3-attendance/alembic.ini') != ''  # active from T3.1 on
+        run: uv run alembic upgrade head
+
+      - name: Dependency rule (import-linter)
+        run: uv run lint-imports
+
+      - name: Tests (all markers)
+        run: uv run pytest
