@@ -12,12 +12,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
+from tmc_attendance.application.dto import (
+    AuthenticatedStation,
+    IngestEventCommand,
+)
 from tmc_attendance.domain.model import (
     AttendanceEvent,
     Direction,
     EvidenceLevel,
 )
-from tmc_attendance.domain.values import StationId
+from tmc_attendance.domain.values import StationId, parse_station_id
 
 SAMPLE_STATION_ID = "BD-G01-IN"
 SAMPLE_STATION_TOKEN = "dev-token-bd-g01-in"  # dev-only; its sha256 is in .env.example
@@ -78,3 +82,21 @@ def make_event(**overrides: Any) -> AttendanceEvent:
     fields["station_id"] = StationId(fields["station_id"])
 
     return AttendanceEvent(**fields)
+
+
+def make_command(**overrides: Any) -> IngestEventCommand:
+    """Build an ingestion command without enforcing entity invariants."""
+    fields = event_fields(**overrides)
+
+    fields["direction"] = Direction(fields["direction"])
+    fields["evidence_level"] = EvidenceLevel(fields["evidence_level"])
+    fields["station_id"] = StationId(fields["station_id"])
+
+    return IngestEventCommand(**fields)
+
+
+def make_station(
+    station_id: str = SAMPLE_STATION_ID,
+) -> AuthenticatedStation:
+    """Build an authenticated station with a valid identifier."""
+    return AuthenticatedStation(station_id=parse_station_id(station_id))

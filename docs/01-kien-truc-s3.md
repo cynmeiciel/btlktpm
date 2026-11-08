@@ -177,7 +177,20 @@ class HealthProbe(ABC):
     def is_ready(self) -> bool: ...
 ```
 
-`UnitOfWork.__enter__`/`__exit__` có cài đặt mặc định ở lớp cơ sở (gọi `rollback()` khi thoát mà chưa `commit()`); lớp con chỉ cần cài `commit`, `rollback` và việc mở/đóng kết nối.
+`UnitOfWork.__enter__()` mặc định trả về chính đối tượng.
+Adapter có thể override để mở connection và transaction.
+
+`UnitOfWork.__exit__()` luôn gọi `rollback()` để dọn thay đổi
+chưa commit và không suppress exception.
+
+Hợp đồng `rollback()`:
+- Bỏ các thay đổi đang chờ trong transaction.
+- Nếu không còn thay đổi đang chờ, thao tác không làm gì.
+- Không được xóa hoặc hoàn tác dữ liệu đã commit.
+
+Adapter persistence phải bảo đảm đóng connection khi thoát context,
+kể cả khi có exception. Fake và adapter PostgreSQL phải tuân thủ
+cùng hợp đồng về commit và rollback.
 
 ## 4. Use case
 
@@ -189,7 +202,11 @@ Phụ thuộc (qua constructor): `UnitOfWorkFactory`, `Clock`, `IdGenerator`, `E
 execute(cmd: IngestEventCommand, station: AuthenticatedStation) -> IngestResult
 
  1. received_at = clock.now()
- 2. Dựng AttendanceEvent từ cmd. InvalidEvent → REJECTED(INVALID_FORMAT)
+ 2. Dựng AttendanceEvent từ cmd.
+   InvalidEvent với field="schemaVersion"
+     → REJECTED(UNSUPPORTED_SCHEMA_VERSION)
+   InvalidEvent khác
+     → REJECTED(INVALID_FORMAT)
  3. event.station_id != station.station_id → REJECTED(STATION_MISMATCH)
  4. reason = policy.check(event, received_at); có reason → REJECTED(reason)
  5. h = compute_payload_hash(event)
@@ -198,7 +215,9 @@ execute(cmd: IngestEventCommand, station: AuthenticatedStation) -> IngestResult
       Inserted        → uow.outbox.add(AttendanceEventAccepted v1)
                         uow.commit()                → ACCEPTED
       EventIdExists   → rule.decide(h, existing_hash)
-                          DUPLICATE → (không ghi gì) → DUPLICATE
+                          DUPLICATE → không thêm event/outbox
+                                    → uow.commit()
+                                    → trả DUPLICATE
                           CONFLICT  → uow.attendance.record_conflict(PAYLOAD_MISMATCH)
                                       uow.commit()  → CONFLICT(PAYLOAD_MISMATCH)
  7. Lỗi hạ tầng (DB mất kết nối...) không bị nuốt: exception đi lên adapter → HTTP 503.
@@ -318,3 +337,43 @@ Sync Worker ──HTTPS POST /v1/attendance-event-batches──▶ FastAPI
 ```
 
 Đây là nguyên liệu cho component-and-connector view trong báo cáo M2 (xem `12-report-mapping.md`).
+
+## 9. Hợp đồng DTO của Application
+
+DTO nằm trong `application/dto.py`, dùng dataclass frozen và slots.
+Tên field nội bộ là snake_case; adapter HTTP chuyển sang camelCase.
+
+- `IngestEventCommand` chứa chín field chuẩn của sự kiện.
+  Command không kiểm các bất biến nghiệp vụ; use case dựng
+  `AttendanceEvent` để kiểm tra.
+- `AuthenticatedStation` chứa `station_id` đã được xác thực,
+  không chứa token thô.
+- `FieldError` chứa `field` và `message`, không chứa giá trị
+  đầu vào nhạy cảm.
+- `InvalidItem` chứa các lỗi parse đã làm sạch và `event_id`
+  hợp lệ nếu đọc được; nếu không thì `event_id=None`.
+- `IngestResult` chứa `event_id`, `status`, `reason`, `errors`
+  và `index`. Single-event use case để `index=None`;
+  batch use case gán index theo thứ tự đầu vào.
+- `reason` nhận `RejectionReason`, `ConflictKind` hoặc None.
+- `BatchResult.results` giữ đúng thứ tự đầu vào.
+  `BatchSummary` đếm accepted, duplicate, conflict và rejected.
+- `EventConflict` giữ bằng chứng payload/hash xung đột;
+  không thay thế hoặc sửa event gốc.
+- `OutboxMessage` được ghi cùng transaction với event mới.
+  `aggregate_id` là event_id; `occurred_at` là received_at.
+- `HistoryQuery` dùng khoảng thời gian
+  `[occurred_from, occurred_to)`, limit mặc định 50,
+  offset mặc định 0.
+- `HistoryPage` chứa items theo thứ tự ổn định và has_more.
+- `AttendanceEventView` cung cấp các field cần cho API
+  lịch sử, gồm occurred_at và received_at.
+
+Các collection kết quả dùng tuple.
+Mapping trong payload là hợp đồng chỉ đọc; frozen dataclass
+không tự đóng băng dict bên trong, nên bên tạo không được
+sửa payload sau khi bàn giao.
+
+`AccessDenied` và `InvalidQuery` nằm trong
+`application/errors.py`. Adapter HTTP chịu trách nhiệm
+chuyển chúng thành HTTP response.
