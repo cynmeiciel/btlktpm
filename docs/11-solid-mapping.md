@@ -42,7 +42,7 @@ Mọi hiện thực của một port phải giữ **hợp đồng hành vi**, kh
 
 | Hợp đồng | Fake | Thật | Test chung |
 |---|---|---|---|
-| `insert_if_absent`: event mới → `Inserted`; trùng id → `EventIdExists(hash cũ)`; chưa commit thì không thấy | `InMemoryAttendanceStore` | `PostgresAttendanceRepository` | `AttendanceWriterContract` (chạy cho cả hai) |
+| `insert_if_absent`: event mới → `Inserted`; trùng id → `EventIdExists(hash cũ)`; chưa commit thì không thấy | `InMemoryAttendanceWriter` | `PostgresAttendanceRepository` | `AttendanceWriterContract` (chạy cho cả hai) |
 | `UnitOfWork`: không commit → không ai thấy thay đổi | `InMemoryUnitOfWork` | `SqlAlchemyUnitOfWork` | `test_nothing_visible_without_commit` |
 | `AttendanceReader`: sắp xếp `(occurredAt, eventId)`, không trùng/sót giữa các trang | `InMemoryAttendanceReader` | `PostgresAttendanceQueries` | contract reader (T5.1) |
 | `Clock.now()` luôn aware UTC | `FixedClock` | `SystemClock` | unit nhỏ cho cả hai |
@@ -86,3 +86,29 @@ Thử nghiệm nên đưa vào báo cáo: tạm thêm `import sqlalchemy` vào `
 | LSP | `AttendanceWriter` + 2 hiện thực | contract test | `AttendanceWriterContract` |
 | ISP | `AttendanceWriter` / `AttendanceReader` tách | grant DB + test fake nhỏ | test quyền DB, test history use case |
 | DIP | `application/ports.py` | import-linter | job CI `test` |
+
+## Bằng chứng đã xác nhận từ phần TV2
+
+| Nguyên tắc | Hiện thực | Bằng chứng |
+|---|---|---|
+| SRP | Tách hash, deduplication, timestamp policy và các use case | test_payload_hash.py, test_dedup.py, test_policy.py |
+| OCP | Use case nhận các dependency qua constructor; adapter thực hiện port | Use case chạy với in-memory adapters mà không chứa SQL |
+| LSP | Fake writer tuân theo hợp đồng AttendanceWriter | Ba test kế thừa AttendanceWriterContract chạy với fake |
+| ISP | AttendanceReader và AttendanceWriter là hai port riêng | Reader fake không phải hiện thực các thao tác ghi |
+| DIP | Application định nghĩa port, use case không import adapter | Cả bốn import-linter contracts được giữ |
+
+Kết quả tại commit d4497f2:
+
+- Toàn bộ kiểm tra: 130 test pass, gồm 5 integration test PostgreSQL.
+- Đo coverage bằng unit/API: 125 test pass.
+- Coverage Domain/Application: 99%; 24/24 nhánh được đo đã được chạy.
+- Hai use case ingest_event và ingest_batch đạt 100% coverage.
+
+Giới hạn:
+
+- Test nghiệp vụ ingest hiện chạy với fake.
+- Năm integration test hiện có kiểm tra hạ tầng DB,
+  chưa kiểm chứng luồng ingest bằng adapter PostgreSQL thật.
+- TV3 cần chạy AttendanceWriterContract với PostgreSQL adapter.
+- Các ví dụ adapter production hoặc chức năng của TV4/TV5
+  trong tài liệu là thiết kế dự kiến, chưa mặc nhiên là phần đã hoàn thành.
