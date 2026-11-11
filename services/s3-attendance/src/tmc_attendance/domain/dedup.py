@@ -1,6 +1,7 @@
 """Canonical payloads and conflict types for attendance events."""
 
 import hashlib
+import hmac
 import json
 from datetime import UTC
 from enum import StrEnum
@@ -38,3 +39,23 @@ def canonical_payload(event: AttendanceEvent) -> bytes:
 def compute_payload_hash(event: AttendanceEvent) -> PayloadHash:
     """Return the SHA-256 digest of the canonical event payload."""
     return PayloadHash(hashlib.sha256(canonical_payload(event)).hexdigest())
+
+
+class DedupDecision(StrEnum):
+    DUPLICATE = "DUPLICATE"
+    CONFLICT = "CONFLICT"
+
+
+class DeduplicationRule:
+    """Classify submissions whose event identifier already exists."""
+
+    def decide(
+        self,
+        incoming: PayloadHash,
+        existing: PayloadHash,
+    ) -> DedupDecision:
+        """Compare the incoming payload hash with the stored hash."""
+        if hmac.compare_digest(incoming, existing):
+            return DedupDecision.DUPLICATE
+
+        return DedupDecision.CONFLICT
