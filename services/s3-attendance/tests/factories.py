@@ -12,6 +12,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
+from tmc_attendance.domain.model import (
+    AttendanceEvent,
+    Direction,
+    EvidenceLevel,
+)
+from tmc_attendance.domain.values import StationId
+
 SAMPLE_STATION_ID = "BD-G01-IN"
 SAMPLE_STATION_TOKEN = "dev-token-bd-g01-in"  # dev-only; its sha256 is in .env.example
 ICT = timezone(timedelta(hours=7), "ICT")
@@ -60,3 +67,14 @@ def event_payload(**overrides: Any) -> dict[str, Any]:
     }
     payload.update(overrides)
     return payload
+
+
+def make_event(**overrides: Any) -> AttendanceEvent:
+    """Build a typed event from valid defaults and optional overrides."""
+    fields = event_fields(**overrides)
+
+    fields["direction"] = Direction(fields["direction"])
+    fields["evidence_level"] = EvidenceLevel(fields["evidence_level"])
+    fields["station_id"] = StationId(fields["station_id"])
+
+    return AttendanceEvent(**fields)
