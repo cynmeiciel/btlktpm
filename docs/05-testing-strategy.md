@@ -47,15 +47,25 @@ class DatabaseAdminSettings(BaseSettings):
 
 | Fake | Hành vi bắt buộc |
 |---|---|
-| `FixedClock(at)` | `now()` trả `at`; có `advance(delta)` |
+| `FixedClock(at)` | nhận thời gian có timezone, `now()` trả thời điểm tương đương ở UTC; có `advance(delta)` |
 | `SequentialIdGenerator` | trả UUID tất định `00000000-0000-0000-0000-000000000001`, `...0002`, … |
-| `InMemoryAttendanceStore` | giữ dict theo `event_id`; `insert_if_absent` trả `Inserted` hoặc `EventIdExists` giống adapter Postgres |
+| `InMemoryAttendanceStore` | giữ event theo `event_id`, conflict và outbox; mỗi UoW có buffer riêng, tách khỏi store đã commit |
+| `InMemoryAttendanceWriter(store, pending)` | hiện thực `AttendanceWriter`; `insert_if_absent` trả `Inserted` hoặc `EventIdExists`, không ghi đè event cũ; conflict được ghi vào buffer, mỗi `(event_id, kind, incoming_hash)` chỉ lưu một lần như ràng buộc `uq_event_conflict_once` |
 | `InMemoryUnitOfWork(store)` | ghi vào bộ đệm, chỉ áp vào `store` khi `commit()`; `rollback` bỏ bộ đệm; đếm `commits`, `rollbacks` |
 | `InMemoryUnitOfWorkFactory(store)` | callable trả `InMemoryUnitOfWork`; đếm `opened` (để kiểm "bị từ chối thì không mở UoW"); có thể cấu hình để `commit` hoặc `outbox.add` ném lỗi |
 | `InMemoryOutbox` | danh sách message; gắn với UoW |
 | `FakeStationAuthenticator(mapping)` | token → station |
 | `FakeHealthProbe(ready=True)` | |
 | `InMemoryAttendanceReader(store)` | lọc/sắp xếp/phân trang giống adapter thật |
+
+Factory cung cấp các cờ `fail_on_commit`, `fail_on_outbox_add` và các bộ đếm
+`opened`, `commits`, `rollbacks`. Thoát UoW không commit sẽ bỏ buffer; rollback
+sau commit không thay đổi dữ liệu đã lưu. Reader chỉ đọc committed store,
+lọc khoảng `[from, to)`, sắp xếp theo thời gian rồi event ID và trả `has_more`.
+
+Các fake phục vụ kiểm thử tuần tự, không mô phỏng đầy đủ concurrency hoặc
+isolation của PostgreSQL. Contract writer đã được chạy với fake; TV3 cần
+chạy lại cùng bộ contract với adapter PostgreSQL ở T3.3.
 
 Không dùng `unittest.mock.Mock` để giả port của chính dự án. `Mock` chấp nhận mọi lời gọi nên không phát hiện được khi use case gọi sai hợp đồng. `monkeypatch` chỉ dùng cho biến môi trường.
 
@@ -66,9 +76,12 @@ Không dùng `unittest.mock.Mock` để giả port của chính dự án. `Mock`
 class AttendanceWriterContract:
     @pytest.fixture
     def uow_factory(self) -> UnitOfWorkFactory: raise NotImplementedError
+    @pytest.fixture
+    def count_conflicts(self) -> Callable[[], int]: raise NotImplementedError  # đếm conflict đã commit
     def test_first_insert_returns_inserted(self, uow_factory): ...
     def test_same_event_id_returns_event_id_exists_with_hash(self, uow_factory): ...
     def test_nothing_visible_without_commit(self, uow_factory): ...
+    def test_same_conflict_recorded_twice_is_stored_once(self, uow_factory, count_conflicts): ...
 
 # tests/unit/application/test_in_memory_writer_contract.py
 class TestInMemoryWriter(AttendanceWriterContract): ...   # fixture trả fake
