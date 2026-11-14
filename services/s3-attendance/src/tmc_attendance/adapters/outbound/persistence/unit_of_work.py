@@ -1,5 +1,7 @@
 """SQLAlchemy implementation of the application's unit-of-work port."""
 
+from collections.abc import Callable
+from importlib import import_module
 from types import TracebackType
 from typing import Self
 
@@ -26,17 +28,16 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
             self._connection = connection
             self._transaction = transaction
 
-            # These adapters are added in T3.3 and T3.4; import only when opening
-            # a unit of work so this module remains importable before those tasks land.
-            from tmc_attendance.adapters.outbound.persistence.attendance_repository import (  # type: ignore[import-untyped]
+            from tmc_attendance.adapters.outbound.persistence.attendance_repository import (
                 PostgresAttendanceRepository,
-            )
-            from tmc_attendance.adapters.outbound.persistence.outbox import (  # type: ignore[import-untyped]
-                PostgresOutbox,
             )
 
             self.attendance = PostgresAttendanceRepository(connection)
-            self.outbox = PostgresOutbox(connection)
+            outbox_module = import_module("tmc_attendance.adapters.outbound.persistence.outbox")
+            outbox_factory: Callable[[Connection], OutboxPort] = outbox_module.__dict__[
+                "PostgresOutbox"
+            ]
+            self.outbox = outbox_factory(connection)
         except Exception:
             if self._transaction is not None and self._transaction.is_active:
                 self._transaction.rollback()
