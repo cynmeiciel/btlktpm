@@ -4,6 +4,7 @@ import pytest
 
 from tmc_attendance.adapters.inbound.http.app import create_app
 from tmc_attendance.adapters.outbound.persistence.health import PostgresHealthProbe
+from tmc_attendance.adapters.outbound.station_auth import StaticTokenStationAuthenticator
 from tmc_attendance.bootstrap.config import Settings
 from tmc_attendance.bootstrap.container import build_api_dependencies
 
@@ -28,6 +29,7 @@ def test_build_api_dependencies_uses_postgres_probe() -> None:
     deps = build_api_dependencies(Settings(database_url=URL))
 
     assert isinstance(deps.health, PostgresHealthProbe)
+    assert isinstance(deps.station_authenticator, StaticTokenStationAuthenticator)
 
 
 def test_app_exposes_health_routes() -> None:

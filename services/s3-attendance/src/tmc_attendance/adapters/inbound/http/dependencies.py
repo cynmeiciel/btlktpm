@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
-from tmc_attendance.application.ports import HealthProbe
+from tmc_attendance.application.ports import HealthProbe, StationAuthenticator
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +16,7 @@ class ApiDependencies:
     """Use cases and ports exposed to the routes. Grows as features land (T4.x)."""
 
     health: HealthProbe
+    station_authenticator: StationAuthenticator | None = None
 
 
 def get_api_dependencies(request: Request) -> ApiDependencies:

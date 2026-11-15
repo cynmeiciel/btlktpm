@@ -127,6 +127,8 @@ class StationAuthenticator(ABC):
     def authenticate(self, bearer_token: str) -> AuthenticatedStation | None:
         """Return the authenticated station, or None for invalid credentials."""
 
+from tmc_attendance.application.dto import AuthenticatedStation
+
 
 class HealthProbe(ABC):
     """Report whether the service dependencies are available."""

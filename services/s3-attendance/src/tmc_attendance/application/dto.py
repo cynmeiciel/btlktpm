@@ -24,8 +24,6 @@ class IngestEventCommand:
     local_sequence: int
     evidence_level: EvidenceLevel
     schema_version: int
-
-
 @dataclass(frozen=True, slots=True)
 class AuthenticatedStation:
     """Identify the station established by device authentication."""
