@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from tmc_attendance.adapters.inbound.http import health
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
 from tmc_attendance.adapters.inbound.http.errors import register_exception_handlers
+from tmc_attendance.adapters.inbound.http.ingest import EventIngestController
 
 
 def create_app(deps: ApiDependencies) -> FastAPI:
@@ -13,4 +14,5 @@ def create_app(deps: ApiDependencies) -> FastAPI:
     app.state.api_dependencies = deps
     register_exception_handlers(app)
     app.include_router(health.router)
+    app.include_router(EventIngestController().build_router())
     return app

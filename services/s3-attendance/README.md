@@ -2,7 +2,7 @@
 
 Service tiếp nhận, chống trùng lặp và lưu giữ sự kiện chấm công ở trung tâm. Thiết kế: `docs/01-kien-truc-s3.md` ở gốc repo.
 
-Trạng thái: walking skeleton (backlog T0.7). Route ingest ở mục "Thử nhanh" chạy được từ T4.3.
+Trạng thái: health checks và khung HTTP ingest đã có (T4.1–T4.3). Luồng ingest trả 503 cho tới khi use case đơn event (T2.3) và persistence của Phase 3 được nối trong composition root.
 
 Cài đặt trên Windows hoặc Arch Linux: `docs/10-local-setup.md`. Mọi lệnh dưới đây chạy trong thư mục này và giống nhau trên PowerShell và bash, trừ chỗ có ghi chú.
 
@@ -37,7 +37,7 @@ curl localhost:8000/health/ready
 curl -X POST localhost:8000/v1/attendance-event-batches -H "Authorization: Bearer dev-token-bd-g01-in" -H "Content-Type: application/json" --data "@scripts/sample-batch.json"
 ```
 
-Lần đầu kết quả là `ACCEPTED`. Gửi lại đúng lệnh đó: kết quả phải là `DUPLICATE`, và bảng `attendance.attendance_event` vẫn chỉ có một dòng. Giao diện thử API: http://localhost:8000/docs.
+Endpoint và hợp đồng HTTP đã có, nhưng composition root chưa thể nối use case ingest cho tới khi T2.3 và các adapter persistence Phase 3 được tích hợp. Trong trạng thái hiện tại request sẽ trả 503. Sau khi tích hợp xong, lần đầu gửi lô sẽ trả `ACCEPTED`; gửi lại đúng lệnh đó phải trả `DUPLICATE`, bảng `attendance.attendance_event` vẫn chỉ có một dòng. Giao diện thử API: http://localhost:8000/docs.
 
 Token dev `dev-token-bd-g01-in` đã được khai báo sẵn (dạng sha256) trong `.env.example` và `infra/compose.yaml`. Thêm trạm mới thì tính sha256 của token bằng:
 

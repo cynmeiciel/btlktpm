@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from fastapi import Request
 
+from tmc_attendance.application.ingest_batch import IngestAttendanceBatchUseCase
 from tmc_attendance.application.ports import HealthProbe, StationAuthenticator
 
 
@@ -17,6 +18,8 @@ class ApiDependencies:
 
     health: HealthProbe
     station_authenticator: StationAuthenticator | None = None
+    ingest_batch: IngestAttendanceBatchUseCase | None = None
+    max_batch_size: int = 500
 
 
 def get_api_dependencies(request: Request) -> ApiDependencies:

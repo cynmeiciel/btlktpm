@@ -22,8 +22,8 @@ async def handle_validation_error(_request: Request, exc: Exception) -> JSONResp
         raise TypeError("Validation handler received an unexpected exception")
     errors = [
         {
-            "field": _field_name(error["loc"]),
-            "message": _safe_validation_message(error["type"]),
+            "field": field_name(error["loc"]),
+            "message": safe_validation_message(error["type"]),
         }
         for error in exc.errors()
     ]
@@ -38,12 +38,14 @@ async def handle_database_error(_request: Request, _exc: Exception) -> JSONRespo
     return JSONResponse(status_code=503, content={"detail": "Service unavailable"})
 
 
-def _field_name(location: tuple[str | int, ...]) -> str:
+def field_name(location: tuple[str | int, ...]) -> str:
     parts = [str(part) for part in location if part not in {"body", "query", "path", "header"}]
     return ".".join(parts) or "request"
 
 
-def _safe_validation_message(error_type: str) -> str:
+def safe_validation_message(error_type: str) -> str:
+    if error_type.startswith("datetime_"):
+        return "Input should be a valid datetime"
     messages = {
         "missing": "Field required",
         "int_parsing": "Input should be a valid integer",

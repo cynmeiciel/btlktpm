@@ -24,4 +24,5 @@ def build_api_dependencies(settings: Settings) -> ApiDependencies:
     return ApiDependencies(
         health=PostgresHealthProbe(engine),
         station_authenticator=StaticTokenStationAuthenticator(settings.station_tokens),
+        max_batch_size=settings.max_batch_size,
     )
