@@ -120,6 +120,12 @@ class InMemoryAttendanceWriter(AttendanceWriter):
         return Inserted()
 
     def record_conflict(self, conflict: EventConflict) -> None:
+        """Store each (event_id, kind, incoming_hash) once, like the Postgres unique key."""
+        key = (conflict.event_id, conflict.kind, conflict.incoming_hash)
+        recorded = (*self._store.conflicts, *self._pending.conflicts)
+        if any((c.event_id, c.kind, c.incoming_hash) == key for c in recorded):
+            return
+
         self._pending.conflicts.append(conflict)
 
 
