@@ -8,13 +8,12 @@ manage objects inside it, and the version table lives there too.
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from tmc_attendance.adapters.outbound.persistence.tables import metadata
 from tmc_attendance.bootstrap.config import DatabaseAdminSettings
 
 SCHEMA = "attendance"
 
-# Set to the Core MetaData from adapters/outbound/persistence/tables.py in T3.2
-# so that `alembic check` can compare models with the database.
-target_metadata = None
+target_metadata = metadata
 
 
 def _migration_url() -> str:
