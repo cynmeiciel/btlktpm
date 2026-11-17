@@ -95,7 +95,7 @@ services/s3-attendance/
 │   └── bootstrap/
 │       ├── __init__.py
 │       ├── config.py               # Settings, DatabaseAdminSettings (pydantic-settings)
-│       ├── container.py            # build_api_dependencies(settings): nối adapter thật
+│       ├── container.py            # build_api_dependencies(settings), wire_api_dependencies(engine, settings)
 │       └── main.py                 # app = create_app(build_api_dependencies(Settings()))
 └── tests/
     ├── conftest.py                 # gán marker theo thư mục, fixture DB
@@ -107,7 +107,7 @@ services/s3-attendance/
     │   └── application/
     ├── api/                        # TestClient + ApiDependencies dựng từ fake
     ├── integration/                # adapter thật + PostgreSQL thật
-    └── e2e/                        # TestClient + build_api_dependencies thật + PostgreSQL
+    └── e2e/                        # TestClient + wire_api_dependencies thật + PostgreSQL
 ```
 
 ## 3. Port (định nghĩa trong `application/ports.py`)
@@ -287,7 +287,7 @@ Tech lead cập nhật lại Hình 7 (PlantUML) cho báo cáo M2 khi Phase 2 xon
 Ai khai báo cái gì:
 
 - **Adapter HTTP tự khai báo thứ nó cần** trong `adapters/inbound/http/dependencies.py`: dataclass `ApiDependencies` chỉ chứa port và use case (kiểu của `application`), cộng vài giá trị đơn giản như `max_batch_size`.
-- **`bootstrap` đáp ứng nhu cầu đó**: `build_api_dependencies(settings)` tạo adapter thật và trả về `ApiDependencies`.
+- **`bootstrap` đáp ứng nhu cầu đó**: `build_api_dependencies(settings)` tạo engine rồi gọi `wire_api_dependencies(engine, settings)` để nối mọi adapter thật. E2E gọi thẳng `wire_api_dependencies` với engine của fixture, nên test chạy đúng cách nối dây của production.
 
 Lý do không đặt `Container` ở `bootstrap` rồi truyền vào `create_app`: khi đó `adapters` phải import `bootstrap` để biết kiểu, tức là import ngược layer, và contract layers của import-linter sẽ báo lỗi. Để adapter định nghĩa "hợp đồng" còn composition root hiện thực nó là DIP áp dụng cho chính việc nối dây.
 
@@ -295,28 +295,36 @@ Lý do không đặt `Container` ở `bootstrap` rồi truyền vào `create_app
 # adapters/inbound/http/dependencies.py
 @dataclass(frozen=True, slots=True)
 class ApiDependencies:
-    health: HealthProbe                                # có từ walking skeleton
-    # thêm dần theo task:
-    # ingest_batch: IngestAttendanceBatchUseCase       # T4.3
-    # history: GetAttendanceHistoryUseCase             # T5.2
-    # station_authenticator: StationAuthenticator      # T4.2
-    # max_batch_size: int                              # T4.3
+    health: HealthProbe
+    station_authenticator: StationAuthenticator | None = None   # None → route trả 503
+    ingest_batch: IngestAttendanceBatchUseCase | None = None
+    max_batch_size: int = 500
+    history: GetAttendanceHistoryUseCase | None = None
 
 def get_api_dependencies(request: Request) -> ApiDependencies: ...   # đọc app.state
 
 # bootstrap/container.py
 def build_api_dependencies(settings: Settings) -> ApiDependencies:
-    engine = create_app_engine(settings)   # pool_pre_ping, connect_timeout
-    clock = SystemClock()
-    ids = Uuid4Generator()
-    uow_factory = lambda: SqlAlchemyUnitOfWork(engine)
-    single = IngestAttendanceEventUseCase(
-        uow_factory, clock, ids,
+    return wire_api_dependencies(create_app_engine(settings), settings)
+
+def wire_api_dependencies(engine: Engine, settings: Settings) -> ApiDependencies:
+    def uow_factory() -> UnitOfWork:
+        return SqlAlchemyUnitOfWork(engine)
+    ingest_event = IngestAttendanceEventUseCase(
+        uow_factory, SystemClock(), Uuid4Generator(),
         EventValidationPolicy(timedelta(seconds=settings.max_future_skew_seconds)),
         DeduplicationRule(),
     )
-    return ApiDependencies(health=PostgresHealthProbe(engine), ...)
+    return ApiDependencies(
+        health=PostgresHealthProbe(engine),
+        station_authenticator=StaticTokenStationAuthenticator(settings.station_tokens),
+        ingest_batch=IngestAttendanceBatchUseCase(ingest_event),
+        max_batch_size=settings.max_batch_size,
+        history=GetAttendanceHistoryUseCase(PostgresAttendanceQueries(engine)),
+    )
 ```
+
+Các trường của `ApiDependencies` để `| None` để test API chỉ cần dựng phần mình dùng. Production không bao giờ để trống: `tests/unit/test_bootstrap.py::test_build_api_dependencies_wires_every_dependency` kiểm mọi trường đều đã được nối.
 
 `adapters/inbound/http/app.py`: `create_app(deps: ApiDependencies) -> FastAPI` gắn `deps` vào `app.state.api_dependencies`; route lấy qua `Depends(get_api_dependencies)`. Test API dựng `ApiDependencies` từ fake rồi gọi `create_app`, không cần monkeypatch.
 

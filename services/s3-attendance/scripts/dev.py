@@ -24,7 +24,8 @@ CHECK = [
 
 COMMANDS: dict[str, list[list[str]]] = {
     "check": CHECK,
-    "fmt": [["ruff", "check", "--fix", "."], ["ruff", "format", "."]],
+    # Format first: `ruff check --fix` exits non-zero on unfixable issues and would stop the run.
+    "fmt": [["ruff", "format", "."], ["ruff", "check", "--fix", "."]],
     "test": [["pytest", "-m", "unit or api"]],
     "test-db": [["pytest", "-m", "integration or e2e"]],
     "all": [*CHECK, ["pytest"]],
