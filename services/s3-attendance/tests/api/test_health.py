@@ -1,12 +1,20 @@
 from fastapi.testclient import TestClient
 
-from tests.fakes import FakeHealthProbe
+from tests.fakes import (
+    FakeHealthProbe,
+    InMemoryAttendanceReader,
+    InMemoryAttendanceStore,
+)
 from tmc_attendance.adapters.inbound.http.app import create_app
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
+from tmc_attendance.application.history import GetAttendanceHistoryUseCase
 
 
 def _client(*, ready: bool) -> TestClient:
-    return TestClient(create_app(ApiDependencies(health=FakeHealthProbe(ready=ready))))
+    store = InMemoryAttendanceStore()
+    history = GetAttendanceHistoryUseCase(InMemoryAttendanceReader(store))
+    deps = ApiDependencies(health=FakeHealthProbe(ready=ready), history=history)
+    return TestClient(create_app(deps))
 
 
 def test_live_is_ok_even_when_not_ready() -> None:

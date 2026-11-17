@@ -1,13 +1,20 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
-from tests.fakes import FakeHealthProbe
+from tests.fakes import (
+    FakeHealthProbe,
+    InMemoryAttendanceReader,
+    InMemoryAttendanceStore,
+)
 from tmc_attendance.adapters.inbound.http.app import create_app
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
+from tmc_attendance.application.history import GetAttendanceHistoryUseCase
 
 
 def _client() -> TestClient:
-    app = create_app(ApiDependencies(health=FakeHealthProbe()))
+    store = InMemoryAttendanceStore()
+    history = GetAttendanceHistoryUseCase(InMemoryAttendanceReader(store))
+    app = create_app(ApiDependencies(health=FakeHealthProbe(), history=history))
 
     @app.get("/test-validation")
     def validation_route(value: int) -> dict[str, int]:

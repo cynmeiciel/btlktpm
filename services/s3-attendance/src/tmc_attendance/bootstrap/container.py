@@ -3,7 +3,11 @@
 from sqlalchemy import Engine, create_engine
 
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
+from tmc_attendance.adapters.outbound.persistence.attendance_queries import (
+    PostgresAttendanceQueries,
+)
 from tmc_attendance.adapters.outbound.persistence.health import PostgresHealthProbe
+from tmc_attendance.application.history import GetAttendanceHistoryUseCase
 from tmc_attendance.bootstrap.config import Settings
 
 
@@ -20,4 +24,8 @@ def create_app_engine(settings: Settings) -> Engine:
 def build_api_dependencies(settings: Settings) -> ApiDependencies:
     """Wire real adapters into what the HTTP adapter needs."""
     engine = create_app_engine(settings)
-    return ApiDependencies(health=PostgresHealthProbe(engine))
+    history = PostgresAttendanceQueries(engine)
+    return ApiDependencies(
+        health=PostgresHealthProbe(engine),
+        history=GetAttendanceHistoryUseCase(history),
+    )
