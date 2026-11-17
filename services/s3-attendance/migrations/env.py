@@ -8,7 +8,7 @@ manage objects inside it, and the version table lives there too.
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from tmc_attendance.adapters.outbound.persistence.tables import metadata
+from tmc_attendance.adapters.outbound.persistence.table import metadata
 from tmc_attendance.bootstrap.config import DatabaseAdminSettings
 
 SCHEMA = "attendance"
