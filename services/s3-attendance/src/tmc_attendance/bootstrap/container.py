@@ -3,8 +3,12 @@
 from sqlalchemy import Engine, create_engine
 
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
+from tmc_attendance.adapters.outbound.persistence.attendance_queries import (
+    PostgresAttendanceQueries,
+)
 from tmc_attendance.adapters.outbound.persistence.health import PostgresHealthProbe
 from tmc_attendance.adapters.outbound.station_auth import StaticTokenStationAuthenticator
+from tmc_attendance.application.history import GetAttendanceHistoryUseCase
 from tmc_attendance.bootstrap.config import Settings
 
 
@@ -25,4 +29,5 @@ def build_api_dependencies(settings: Settings) -> ApiDependencies:
         health=PostgresHealthProbe(engine),
         station_authenticator=StaticTokenStationAuthenticator(settings.station_tokens),
         max_batch_size=settings.max_batch_size,
+        history=GetAttendanceHistoryUseCase(PostgresAttendanceQueries(engine)),
     )
