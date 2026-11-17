@@ -8,13 +8,19 @@ manage objects inside it, and the version table lives there too.
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from tmc_attendance.adapters.outbound.persistence.tables import metadata
 from tmc_attendance.bootstrap.config import DatabaseAdminSettings
 
 SCHEMA = "attendance"
 
-# Set to the Core MetaData from adapters/outbound/persistence/tables.py in T3.2
-# so that `alembic check` can compare models with the database.
-target_metadata = None
+target_metadata = metadata
+
+
+def _include_name(name: str | None, type_: str, _parent_names: object) -> bool:
+    """Autogenerate compares only the ``attendance`` schema owned by S3 (ADR02)."""
+    if type_ == "schema":
+        return name == SCHEMA
+    return True
 
 
 def _migration_url() -> str:
@@ -31,6 +37,8 @@ def run_migrations_offline() -> None:
         url=_migration_url(),
         target_metadata=target_metadata,
         version_table_schema=SCHEMA,
+        include_schemas=True,
+        include_name=_include_name,
         literal_binds=True,
     )
     with context.begin_transaction():
@@ -44,6 +52,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             version_table_schema=SCHEMA,
+            include_schemas=True,
+            include_name=_include_name,
         )
         with context.begin_transaction():
             context.run_migrations()
