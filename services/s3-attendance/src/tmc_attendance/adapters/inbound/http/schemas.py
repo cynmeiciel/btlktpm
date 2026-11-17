@@ -47,4 +47,4 @@ class BatchIn(BaseModel):
     )
 
     station_id: str
-    events: list[dict[str, Any]] = Field(min_length=1)
+    events: list[Any] = Field(min_length=1)

@@ -33,7 +33,7 @@ curl localhost:8000/health/ready        # {"status":"ready"}
 # mở http://localhost:8000/docs
 ```
 
-App hiện có health checks và khung HTTP ingest (backlog T4.1–T4.3). Luồng ingest chưa được nối với use case và persistence; endpoint trả 503 cho tới khi T2.3 và các adapter DB của Phase 3 được tích hợp. Tiến độ xem `docs/09-backlog.md`.
+HTTP ingest controller và application use case TV2 đã có. Runtime chưa nối persistence PostgreSQL, nên endpoint ingest chỉ sẵn sàng sau khi các adapter DB của Phase 3 được tích hợp. Tiến độ xem `docs/09-backlog.md`.
 
 Chạy toàn bộ bằng container (DB + migrate + app; cần gói `docker-buildx`):
 

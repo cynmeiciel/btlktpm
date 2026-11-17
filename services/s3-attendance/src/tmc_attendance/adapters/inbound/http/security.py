@@ -1,9 +1,33 @@
 """HTTP authentication helpers for station requests."""
 
-from fastapi import HTTPException, Request, status
+import logging
+from typing import Annotated
 
+from fastapi import Depends, HTTPException, Request, status
+
+from tmc_attendance.adapters.inbound.http.dependencies import (
+    ApiDependencies,
+    get_api_dependencies,
+)
 from tmc_attendance.application.dto import AuthenticatedStation
 from tmc_attendance.application.ports import StationAuthenticator
+
+logger = logging.getLogger(__name__)
+
+
+def require_station(
+    request: Request,
+    deps: Annotated[ApiDependencies, Depends(get_api_dependencies)],
+) -> AuthenticatedStation:
+    """Authenticate before FastAPI validates the request body."""
+    authenticator = deps.station_authenticator
+    if authenticator is None:
+        logger.error("Station authenticator is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unavailable",
+        )
+    return authenticate_station(request, authenticator)
 
 
 def authenticate_station(
