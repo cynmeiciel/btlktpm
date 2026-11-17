@@ -4,6 +4,7 @@ import pytest
 
 from tmc_attendance.adapters.inbound.http.app import create_app
 from tmc_attendance.adapters.outbound.persistence.health import PostgresHealthProbe
+from tmc_attendance.adapters.outbound.station_auth import StaticTokenStationAuthenticator
 from tmc_attendance.bootstrap.config import Settings
 from tmc_attendance.bootstrap.container import build_api_dependencies
 
@@ -25,12 +26,15 @@ def test_settings_read_environment_and_parse_station_tokens_json(
 
 
 def test_build_api_dependencies_uses_postgres_probe() -> None:
-    deps = build_api_dependencies(Settings(database_url=URL))
+    deps = build_api_dependencies(Settings(database_url=URL, max_batch_size=42))
 
     assert isinstance(deps.health, PostgresHealthProbe)
+    assert isinstance(deps.station_authenticator, StaticTokenStationAuthenticator)
+    assert deps.max_batch_size == 42
 
 
 def test_app_exposes_health_routes() -> None:
     app = create_app(build_api_dependencies(Settings(database_url=URL)))
 
     assert {"/health/live", "/health/ready"} <= set(app.openapi()["paths"])
+    assert "/v1/attendance-event-batches" in app.openapi()["paths"]

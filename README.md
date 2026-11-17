@@ -33,7 +33,7 @@ curl localhost:8000/health/ready        # {"status":"ready"}
 # mở http://localhost:8000/docs
 ```
 
-Hiện app mới có walking skeleton (backlog T0.7): chạy được, có `/health/live` và `/health/ready`, chưa có bảng nghiệp vụ hay route ingest. Các phần đó thêm dần theo `docs/09-backlog.md`.
+HTTP ingest controller và application use case TV2 đã có. Runtime chưa nối persistence PostgreSQL, nên endpoint ingest chỉ sẵn sàng sau khi các adapter DB của Phase 3 được tích hợp. Tiến độ xem `docs/09-backlog.md`.
 
 Chạy toàn bộ bằng container (DB + migrate + app; cần gói `docker-buildx`):
 

@@ -16,6 +16,13 @@ SCHEMA = "attendance"
 target_metadata = metadata
 
 
+def _include_name(name: str | None, type_: str, _parent_names: object) -> bool:
+    """Autogenerate compares only the ``attendance`` schema owned by S3 (ADR02)."""
+    if type_ == "schema":
+        return name == SCHEMA
+    return True
+
+
 def _migration_url() -> str:
     url = DatabaseAdminSettings().migration_database_url
     if not url:
@@ -30,6 +37,8 @@ def run_migrations_offline() -> None:
         url=_migration_url(),
         target_metadata=target_metadata,
         version_table_schema=SCHEMA,
+        include_schemas=True,
+        include_name=_include_name,
         literal_binds=True,
     )
     with context.begin_transaction():
@@ -43,6 +52,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             version_table_schema=SCHEMA,
+            include_schemas=True,
+            include_name=_include_name,
         )
         with context.begin_transaction():
             context.run_migrations()

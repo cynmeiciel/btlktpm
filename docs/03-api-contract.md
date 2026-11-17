@@ -18,6 +18,7 @@ Nguồn sự thật lúc chạy là OpenAPI do FastAPI sinh (`/openapi.json`, gi
 Gọi bởi Sync Worker của Gate Agent (M2: test, script giả lập, curl).
 
 ### Xác thực
+Xác thực bearer token được thực hiện trước khi validate request body; request thiếu/sai token luôn nhận 401 kể cả khi body không hợp lệ.
 
 `Authorization: Bearer <station token>`. Token ánh xạ tới đúng một `stationId`. Thiếu/sai → 401.
 
@@ -58,7 +59,7 @@ Gọi bởi Sync Worker của Gate Agent (M2: test, script giả lập, curl).
 
 **Trường lạ (tolerant reader, IADR-006)**: ở cả envelope lẫn item, trường không có trong bảng trên bị **bỏ qua**, không reject. Lý do: Gate Agent tại các trạm được nâng cấp không đồng thời; trạm phiên bản mới thêm trường không được làm kẹt store-and-forward của trạm đó. Trường lạ không vào `payload_hash` (hash chỉ tính trên 9 trường chuẩn, `02-domain-model.md` §4), nên bỏ qua chúng không ảnh hưởng dedupe. Thay đổi phá tương thích đi qua `schemaVersion` hoặc `/v2`, không qua trường lạ.
 
-**Parse hai tầng**: envelope parse chặt theo nghĩa *thiếu trường bắt buộc, sai kiểu, hoặc `events` ngoài khoảng 1…`TMC_S3_MAX_BATCH_SIZE`* → 422 cho cả request (trường lạ vẫn bỏ qua như trên). Từng item parse riêng: item hỏng chỉ làm item đó `REJECTED/INVALID_FORMAT`, các item khác vẫn được xử lý. Vì vậy trong schema Pydantic, `events` là `list[dict[str, Any]]` ở tầng envelope, mỗi phần tử được validate bằng model `EventIn` trong controller.
+**Parse hai tầng**: envelope parse chặt theo nghĩa *thiếu trường bắt buộc, sai kiểu, hoặc `events` ngoài khoảng 1…`TMC_S3_MAX_BATCH_SIZE`* → 422 cho cả request (trường lạ vẫn bỏ qua như trên). Từng item parse riêng: item hỏng, kể cả phần tử không phải object, chỉ làm item đó `REJECTED/INVALID_FORMAT`, các item khác vẫn được xử lý. Vì vậy schema Pydantic giữ `events` là danh sách giá trị JSON ở tầng envelope; controller xác thực từng phần tử bằng model `EventIn`.
 
 ### Response 200
 

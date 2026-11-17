@@ -4,14 +4,15 @@ from fastapi import FastAPI
 
 from tmc_attendance.adapters.inbound.http import health
 from tmc_attendance.adapters.inbound.http.dependencies import ApiDependencies
+from tmc_attendance.adapters.inbound.http.errors import register_exception_handlers
+from tmc_attendance.adapters.inbound.http.ingest import EventIngestController
 
 
 def create_app(deps: ApiDependencies) -> FastAPI:
-    """Build the HTTP application around already-wired dependencies.
-
-    Error handlers are added in T4.1; ingest and history routes in T4.3 and T5.2.
-    """
+    """Build the HTTP application around already-wired dependencies."""
     app = FastAPI(title="TMC S3 Attendance", version="0.1.0")
     app.state.api_dependencies = deps
+    register_exception_handlers(app)
     app.include_router(health.router)
+    app.include_router(EventIngestController().build_router())
     return app
