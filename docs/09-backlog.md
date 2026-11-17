@@ -137,11 +137,13 @@ T0.7 là **code mẫu** cho cả nhóm: port `HealthProbe` → adapter `Postgres
 
 ### T6.2 Docker — Bắt buộc
 - Đã có (T0.7): `Dockerfile`, `.dockerignore`; image chạy non-root, healthcheck, migrate trong container chạy được.
+- Đã kiểm (T6.5): chạy app thật bằng uvicorn, lệnh `curl` trong `services/s3-attendance/README.md` trả `ACCEPTED`, gửi lại trả `DUPLICATE`.
 - AC còn lại: trên cả Arch và Windows (Docker Desktop), `docker compose -f infra/compose.yaml --profile app up --build` cho `/health/ready` 200; sau T4.3, lệnh `curl` trong `services/s3-attendance/README.md` trả `ACCEPTED`. Hướng dẫn ở `10-local-setup.md`.
 
-### T6.5 E2E — Bắt buộc
+### T6.5 Nối dây và E2E — Bắt buộc
 - Phụ thuộc: T4.3, T5.2
-- AC: các kịch bản mức bắt buộc ở `05-testing-strategy.md` §3 (E2E).
+- AC: `SystemClock`, `Uuid4Generator`; `bootstrap/container.py` nối `IngestAttendanceBatchUseCase` với `SqlAlchemyUnitOfWork`; các kịch bản mức bắt buộc ở `05-testing-strategy.md` §3 (E2E).
+- E2E (`tests/e2e/test_ingest_and_history.py`): gửi lô 10 event → 10 ACCEPTED, gửi lại → 10 DUPLICATE, DB đúng 10 event và 10 outbox; payload đổi → CONFLICT, event gốc không đổi, conflict gửi lại 2 lần chỉ lưu 1; nhân viên đọc lịch sử của mình sau ingest; role S4 đọc view `v1` thấy event vừa nhận.
 
 ---
 

@@ -33,6 +33,15 @@ def test_build_api_dependencies_uses_postgres_probe() -> None:
     assert deps.max_batch_size == 42
 
 
+def test_build_api_dependencies_wires_every_dependency() -> None:
+    """The real app must never fall back to the 503 'not configured' paths."""
+    deps = build_api_dependencies(Settings(database_url=URL))
+
+    missing = [name for name in deps.__slots__ if getattr(deps, name) is None]
+
+    assert missing == []
+
+
 def test_app_exposes_health_routes() -> None:
     app = create_app(build_api_dependencies(Settings(database_url=URL)))
 

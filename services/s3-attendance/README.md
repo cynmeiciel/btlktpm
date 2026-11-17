@@ -2,7 +2,7 @@
 
 Service tiếp nhận, chống trùng lặp và lưu giữ sự kiện chấm công ở trung tâm. Thiết kế: `docs/01-kien-truc-s3.md` ở gốc repo.
 
-Trạng thái: HTTP ingest controller và application use case TV2 đã có. Runtime chưa nối persistence PostgreSQL, nên endpoint ingest hiện trả 503 cho tới khi adapter DB Phase 3 được tích hợp vào composition root.
+Trạng thái: luồng ingest và đọc lịch sử chạy đầy đủ trên PostgreSQL (domain, use case, adapter Postgres, HTTP API, E2E).
 
 Cài đặt trên Windows hoặc Arch Linux: `docs/10-local-setup.md`. Mọi lệnh dưới đây chạy trong thư mục này và giống nhau trên PowerShell và bash, trừ chỗ có ghi chú.
 
@@ -37,7 +37,7 @@ curl localhost:8000/health/ready
 curl -X POST localhost:8000/v1/attendance-event-batches -H "Authorization: Bearer dev-token-bd-g01-in" -H "Content-Type: application/json" --data "@scripts/sample-batch.json"
 ```
 
-Controller dùng use case TV2 thật và API tests dùng in-memory fakes. Runtime vẫn trả 503 cho ingest cho tới khi persistence adapter Phase 3 được nối vào composition root. Sau khi tích hợp xong, gửi lại cùng lô phải trả `DUPLICATE` mà không tạo thêm dòng trong `attendance.attendance_event`. Giao diện thử API: http://localhost:8000/docs.
+Lần đầu kết quả là `ACCEPTED`. Gửi lại đúng lệnh đó: kết quả phải là `DUPLICATE`, và bảng `attendance.attendance_event` vẫn chỉ có một dòng. Giao diện thử API: http://localhost:8000/docs.
 
 Token dev `dev-token-bd-g01-in` đã được khai báo sẵn (dạng sha256) trong `.env.example` và `infra/compose.yaml`. Thêm trạm mới thì tính sha256 của token bằng:
 
