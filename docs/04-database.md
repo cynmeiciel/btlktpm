@@ -145,8 +145,8 @@ Không dùng `Session` ORM. Một UoW = một connection = một transaction.
 
 - `alembic.ini` không chứa URL; `migrations/env.py` lấy `TMC_S3_MIGRATION_DATABASE_URL` qua `DatabaseAdminSettings` (`bootstrap/config.py`, đọc cả `.env`); thiếu → báo lỗi rõ ràng.
 - `version_table_schema="attendance"` để bảng `alembic_version` nằm trong schema của S3, không đụng `public`.
-- `target_metadata = tables.metadata` chỉ để so lệch giữa `tables.py` và DB — kiểm bằng một pytest gọi API `alembic` tương đương `alembic check` (tuỳ chọn), nên tự chạy trong CI cùng mọi test.
-- Mỗi migration phải có `downgrade()` chạy được. Có một pytest chạy upgrade → downgrade base → upgrade lại (chạy trong job `test`).
+- `target_metadata = tables.metadata` chỉ để so lệch giữa `tables.py` và DB. Kiểm bằng tay với `uv run alembic check`; CI chưa chạy lệnh này.
+- Mỗi migration phải có `downgrade()` chạy được. Kiểm bằng tay trên DB dev: `uv run alembic downgrade base`, rồi `uv run alembic upgrade head` (lệnh đầu xoá toàn bộ bảng của S3). Chưa có pytest tự động cho việc này; đây là test mức Tuỳ chọn ở `05-testing-strategy.md` §3.
 - Tên file: `NNNN_<mô_tả_snake_case>.py`, `revision` = `"NNNN"` để thứ tự dễ đọc.
 - Migration đã merge vào `main` không sửa. Thay đổi phá tương thích theo expand → migrate → contract (M1 chương 6, quy tắc 3): ba migration riêng ở ba PR.
 

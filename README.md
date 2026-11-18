@@ -33,7 +33,7 @@ curl localhost:8000/health/ready        # {"status":"ready"}
 # mở http://localhost:8000/docs
 ```
 
-HTTP ingest controller và application use case TV2 đã có. Runtime chưa nối persistence PostgreSQL, nên endpoint ingest chỉ sẵn sàng sau khi các adapter DB của Phase 3 được tích hợp. Tiến độ xem `docs/09-backlog.md`.
+App đã chạy đầy đủ trên PostgreSQL: tiếp nhận lô sự kiện, chống trùng, ghi xung đột, ghi outbox và tra lịch sử. Tiến độ xem `docs/09-backlog.md`.
 
 Chạy toàn bộ bằng container (DB + migrate + app; cần gói `docker-buildx`):
 
